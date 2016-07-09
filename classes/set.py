@@ -80,7 +80,7 @@ class Set(object):
         return True
 
     def intersect(self, other):
-        """Returns the intersection the Set with another Set"""
+        """Returns the intersection of the Set with another Set"""
         result = Set([])
         for i in self.items:
             if i in other.items:

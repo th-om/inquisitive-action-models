@@ -53,32 +53,32 @@ M = Model(W,Sigma,V)
 
 
 #Define action points and their content
-s = ActionPoint('s',Question(p))
-t = ActionPoint('t',Question(q))
+x = ActionPoint('x',Question(p))
+y = ActionPoint('y',q)
 
 #Define domain of action model
-S = Set([s,t])
+S = Set([x,y])
 
 #Define state map of action model
 Delta = StateMap({
     a: {
-        s: S.powerset(),
-        t: S.powerset()
+        x: Set([[x]]).downset(),
+        y: Set([[y]]).downset()
     },
     b: {
-        s: Set([[s],[t]]).downset(),
-        t: Set([[s],[t]]).downset()
+        x: Set([[x],[y]]).downset(),
+        y: Set([[x],[y]]).downset()
     },
     c: {
-        s: Set([[s]]).downset(),
-        t: Set([[t]]).downset()
+        x: S.powerset(),
+        y: S.powerset()
     }
 })
 
 #Define action model
 N = ActionModel(S,Delta)
 
-#Define the epistemic model afther update
+#Define the epistemic model after update
 O = M * N
 
 #Print results

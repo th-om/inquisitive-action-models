@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from style import *
+from formula import *
 
 class World(object):
     def __init__(self,name):

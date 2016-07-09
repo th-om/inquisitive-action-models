@@ -2,11 +2,22 @@
 # -*- coding: utf-8 -*-
 from set import *
 from style import *
-
-#TODO: cache result of getProposition to make things a little faster
+from model import *
 
 class Formula(object):
-    def getProposition(self,model):
+    def __init__(self):
+        self.supportSet = {}
+
+    def getDeclarativeVariant(self):
+        raise NotImplementedError
+
+    def getSupportSet(self,model):
+        if model not in self.supportSet: #To speed things up, only calculate a support set from a formula once
+            self.supportSet[model] = self.calculateSupportSet(model)
+
+        return self.supportSet[model]
+
+    def calculateSupportSet(self,model):
         raise NotImplementedError
 
     def __str__(self):
@@ -14,7 +25,10 @@ class Formula(object):
 
 class Top(Formula):
 
-    def getProposition(self,model):
+    def getDeclarativeVariant(self):
+        return self
+
+    def calculateSupportSet(self,model):
         return model.domain.powerset()
 
     def __str__(self):
@@ -22,7 +36,10 @@ class Top(Formula):
 
 class Bottom(Formula):
 
-    def getProposition(self,model):
+    def getDeclarativeVariant(self):
+        return self
+
+    def calculateSupportSet(self,model):
         return Set([[]])
 
     def __str__(self):
@@ -31,8 +48,12 @@ class Bottom(Formula):
 class Atom(Formula):
     def __init__(self,letter):
         self.letter = letter
+        Formula.__init__(self)
 
-    def getProposition(self,model):
+    def getDeclarativeVariant(self):
+        return self
+
+    def calculateSupportSet(self,model):
         return model.valuation[self].powerset()
 
     def __str__(self):
@@ -41,10 +62,14 @@ class Atom(Formula):
 class Negation(Formula):
     def __init__(self,sub):
         self.sub = sub
+        Formula.__init__(self)
 
-    def getProposition(self,model):
-        #return Implication(self.sub,Bottom()).getProposition(model) # ¬p is defined as p → ⊥. This however makes the script very slow
-        return (model.domain - self.sub.getProposition(model).union()).powerset()
+    def getDeclarativeVariant(self):
+        return Negation(self.sub.getDeclarativeVariant())
+
+    def calculateSupportSet(self,model):
+        # ¬p is defined as p → ⊥. However, calculating the support set this way makes the script very slow, so we do this in a simplified way
+        return (model.domain - self.sub.getSupportSet(model).union()).powerset()
 
     def __str__(self):
         return '¬' + str(self.sub)
@@ -52,9 +77,13 @@ class Negation(Formula):
 class Question(Formula):
     def __init__(self,sub):
         self.sub = sub
+        Formula.__init__(self)
 
-    def getProposition(self,model):
-        return InqDisjunction(self.sub,Negation(self.sub)).getProposition(model)
+    def getDeclarativeVariant(self):
+        return Top()
+
+    def calculateSupportSet(self,model):
+        return InqDisjunction(self.sub,Negation(self.sub)).getSupportSet(model)
 
     def __str__(self):
         return '?' + str(self.sub)
@@ -62,14 +91,18 @@ class Question(Formula):
 class Conjunction(Formula):
     def __init__(self,*args):
         self.conjuncts = args
+        Formula.__init__(self)
 
-    def getProposition(self,model):
+    def getDeclarativeVariant(self):
+        return Conjunction(*[conjunct.getDeclarativeVariant() for conjunct in self.conjuncts])
+
+    def calculateSupportSet(self,model):
         result = None
         for conjunct in self.conjuncts:
             if result is None:
-                result = conjunct.getProposition(model)
+                result = conjunct.getSupportSet(model)
             else:
-                result = result.intersect(conjunct.getProposition(model))
+                result = result.intersect(conjunct.getSupportSet(model))
 
         return result
 
@@ -79,12 +112,16 @@ class Conjunction(Formula):
 class ClassicDisjunction(Formula):
     def __init__(self,*args):
         self.disjuncts = args
+        Formula.__init__(self)
 
-    def getProposition(self,model):
+    def getDeclarativeVariant(self):
+        return ClassicDisjunction(*[disjunct.getDeclarativeVariant() for disjunct in self.disjuncts])
+
+    def calculateSupportSet(self,model):
         if len(self.disjuncts) == 1:
-            return self.disjuncts[0].getProposition(model)
+            return self.disjuncts[0].getSupportSet(model)
         else:
-            return Negation(Conjunction(*[Negation(disjunct) for disjunct in self.disjuncts])).getProposition(model)
+            return Negation(Conjunction(*[Negation(disjunct) for disjunct in self.disjuncts])).getSupportSet(model)
 
     def __str__(self):
         string = ' v '.join([str(disjunct) for disjunct in self.disjuncts])
@@ -93,28 +130,41 @@ class ClassicDisjunction(Formula):
         return string
 
 class InqDisjunction(Formula):
-    def __init__(self,disjunct1,disjunct2):
-        self.disjunct1 = disjunct1
-        self.disjunct2 = disjunct2
+    def __init__(self,*args):
+        self.disjuncts = args
+        Formula.__init__(self)
 
-    def getProposition(self,model):
-        return self.disjunct1.getProposition(model) + self.disjunct2.getProposition(model)
+    def getDeclarativeVariant(self):
+        return ClassicDisjunction(*[disjunct.getDeclarativeVariant() for disjunct in self.disjuncts])
+
+    def calculateSupportSet(self,model):
+        prop = Set([])
+        for disjunct in self.disjuncts:
+            prop += disjunct.getSupportSet(model)
+        return prop
 
     def __str__(self):
-        return '(' + str(self.disjunct1) + ' ' + Style.UNDERLINE + 'v' + Style.END + ' ' + str(self.disjunct2) + ')'
+        string = (' ᗐ ').join([str(disjunct) for disjunct in self.disjuncts])
+        if len(self.disjuncts) > 1:
+            string = '(' + string + ')'
+        return string
 
 class Implication(Formula):
     def __init__(self,antecedent,consequent):
         self.antecedent = antecedent
         self.consequent = consequent
+        Formula.__init__(self)
 
-    def getProposition(self,model):
+    def getDeclarativeVariant(self):
+        return Implication(self.antecedent.getDeclarativeVariant(),self.consequent.getDeclarativeVariant())
+
+    def calculateSupportSet(self,model):
         """ For every state s: it is in this proposition iff for every subset t of s, if t in antecedent then t in consequent"""
         prop = Set([])
         for s in model.domain.powerset():
             add_s = True
             for t in s.powerset():
-                if t in self.antecedent.getProposition(model) and t not in self.consequent.getProposition(model):
+                if t in self.antecedent.getSupportSet(model) and t not in self.consequent.getSupportSet(model):
                     add_s = False
                     break
             if add_s:
@@ -124,3 +174,71 @@ class Implication(Formula):
         
     def __str__(self):
         return '(' + str(self.antecedent) + ' → ' + str(self.consequent) + ')'
+
+class Knows(Formula):
+    def __init__(self,agent,sub):
+        self.agent = agent
+        self.sub = sub
+        Formula.__init__(self)
+
+    def getDeclarativeVariant(self):
+        return self
+
+    def calculateSupportSet(self,model):
+        prop = Set([])
+        for s in model.domain.powerset():
+            add_s = True
+            for w in s:
+                sigma_w = model.statemap[self.agent][w].union()
+                if not support(model,sigma_w,self.sub):
+                    add_s = False
+                    break
+            if add_s:
+                prop.add(s)
+        return prop
+
+    def __str__(self):
+        return 'K' + str(self.agent) + '(' + str(self.sub) + ')'
+
+class Entertains(Formula):
+    def __init__(self,agent,sub):
+        self.agent = agent
+        self.sub = sub
+        Formula.__init__(self)
+
+    def getDeclarativeVariant(self):
+        return self
+
+    def calculateSupportSet(self,model):
+        prop = Set([])
+        for s in model.domain.powerset():
+            add_s = True
+            for w in s:
+                sigma_w = model.statemap[self.agent][w]
+                for t in sigma_w:
+                    if not support(model,t,self.sub):
+                        add_s = False
+                        break
+                if not add_s:
+                    break
+            if add_s:
+                prop.add(s)
+        return prop
+
+    def __str__(self):
+        return 'E' + str(self.agent) + '(' + str(self.sub) + ')'
+
+class Wonders(Formula):
+    def __init__(self,agent,sub):
+        self.agent = agent
+        self.sub = sub
+        Formula.__init__(self)
+
+    def getDeclarativeVariant(self):
+        return self
+
+    def calculateSupportSet(self,model):
+        return Conjunction(Negation(Knows(self.sub)),Entertains(self.sub)).getSupportSet()
+
+    def __str__(self):
+        return 'W' + str(self.agent) + '(' + str(self.sub) + ')'
