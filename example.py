@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from classes import *
+from iamlq import *
 
 #Define agents
 a = Agent('a')
