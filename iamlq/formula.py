@@ -80,7 +80,7 @@ class Question(Formula):
         Formula.__init__(self)
 
     def getDeclarativeVariant(self):
-        return Top()
+        return ClassicDisjunction(self.sub,Negation(self.sub))
 
     def calculateSupportSet(self,model):
         return InqDisjunction(self.sub,Negation(self.sub)).getSupportSet(model)
