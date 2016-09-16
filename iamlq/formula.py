@@ -17,6 +17,9 @@ class Formula(object):
 
         return self.supportSet[model]
 
+    def getAlternatives(self,model):
+        return self.getSupportSet(model).maxElements()
+
     def calculateSupportSet(self,model):
         raise NotImplementedError
 

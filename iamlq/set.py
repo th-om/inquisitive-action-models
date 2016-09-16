@@ -159,3 +159,11 @@ class Set(object):
         for elem in self:
             new_set.add(elem.name[index-1])
         return new_set
+
+    def restriction(self,element,index):
+        """Returns the restriction of a Set of n-tuples to the ones that contain a certain element at a certain index"""
+        new_set = Set([])
+        for elem in self:
+            if elem.name[index-1] == element:
+                new_set.add(elem)
+        return new_set
